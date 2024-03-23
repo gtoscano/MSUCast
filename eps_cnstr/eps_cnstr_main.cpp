@@ -18,9 +18,28 @@
 #include <misc_utilities.h>
 #include <nlp.hpp>
 #include <eps_cnstr.h>
-
+#include <nlohmann/json.hpp>
+#include <stdexcept> // For std::runtime_error
 
 using namespace Ipopt;
+using json = nlohmann::json;
+json read_json_file(const std::string& filename) {
+    // Open the JSON file
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open the base scenario file: " << filename << std::endl;
+        exit(-1);
+    }
+
+    // Parse the JSON file directly into a nlohmann::json object
+    json json_obj;
+    try {
+        json_obj = json::parse(file);
+    } catch (const json::parse_error& e) {
+        throw std::runtime_error("Failed to parse JSON file: " + filename + "; error: " + e.what());
+    }
+    return json_obj;
+}
 
 int main(
         int argc,
@@ -30,33 +49,32 @@ int main(
     //run Jefferson.json   output.json  0 0.9 5 
     //run input_base_scenario.json input_scenario.json output.json pollutant_id  target_reduction nsteps 
     std::string filename_in;
-    std::string filename_out;
     std::string filename_scenario;
+    std::string filename_uuids;
+    std::string path_out;
     filename_in = argv[1];
+    json base_scenario_json = read_json_file(filename_in);
+
     filename_scenario = argv[2];
-    filename_out = argv[3];
-    int pollutant_idx = atoi(argv[4]); // 0
-    double reduction= 1.0 - atof(argv[5]); // 0.9
-    int nsteps = atoi(argv[6]); //5
+    json scenario_json = read_json_file(filename_scenario);
+
+    filename_uuids = argv[3];
+    json uuids_json = read_json_file(filename_uuids);
+
+
+    path_out = argv[4];
+    int pollutant_idx = atoi(argv[5]); // 0
+    double reduction= 1.0 - atof(argv[6]); // 0.9
+    int nsteps = atoi(argv[7]); //5
     
     bool evaluate_cast = true;
 
-    if (argc > 7) {
-        evaluate_cast = ( atoi(argv[7]) == 1)? true : false;
+    if (argc > 9) {
+        evaluate_cast = ( atoi(argv[8]) == 1)? true : false;
     }
 
     fmt::print("filename_scenario: {}\n", filename_scenario);
 
-    auto var = std::make_shared<Parameters>();
-    std::string log_filename = fmt::format("{}_ipopt.out", filename_out);
-    var->filename_in = filename_in;
-    var->filename_out = filename_out;
-    var->filename_scenario = filename_scenario;
-    var->log_filename = log_filename;
-    var->reduction = reduction;
-    var->pollutant_idx = pollutant_idx;
-    var->nsteps = nsteps;
-    var->evaluate_cast = evaluate_cast;
 
     int option = 1;
     /*
@@ -74,8 +92,8 @@ int main(
     }
     */
     if (option == 1) { //ipopt Opt3
-        EpsConstraint eps_constr(var);
-        eps_constr.constr_eval(var->reduction, nsteps);
+        EpsConstraint eps_constr(base_scenario_json, scenario_json, uuids_json, path_out, pollutant_idx, evaluate_cast);
+        eps_constr.constr_eval(reduction, nsteps);
     }
     /*
     if (option == 6) { //ipopt Opt3

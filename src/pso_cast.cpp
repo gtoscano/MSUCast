@@ -70,14 +70,14 @@ namespace {
 int main (int argc, char *argv[]) {
     int nparts = 20;
     int nobjs = 2;
-    int max_iter = 5;
+    int max_iter = 1;
     double c1 = 1.4;
     double c2 = 1.4;
     double w = 0.7;
     double lb = 0.0;
     double ub = 1.0;
-    std::string input_filename = "prueba.json"; 
-    std::string scenario_filename = "prueba.json"; 
+    std::string input_filename;
+    std::string scenario_filename;
     std::string dir_output = "./";
     bool is_ef_enabled = false;
     bool is_lc_enabled = true;

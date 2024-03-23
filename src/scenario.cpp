@@ -106,7 +106,7 @@ void Scenario::init(const std::string& filename, const std::string& filename_sce
     }
 
     if (is_manure_enabled) {
-        manure_counties_ = {"102"};//102: Nelson
+        manure_counties_ = {"43"};//102: Nelson
         auto neighbors_file = "cast_neighbors.json";
         load_neighbors(neighbors_file);
         auto manure_nutrients_file = "manurenutrientsconfinement.parquet";
@@ -453,7 +453,8 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
     }
     // Parse the JSON file_scenario directly into a nlohmann::json object
     json json_obj_scenario = json::parse(file_scenario);
-    std::vector<std::string> keys_to_check_scenario = {"selected_bmps", "bmp_cost", "selected_reduction_target", "sel_pollutant", "target_pct"};
+    std::vector<std::string> keys_to_check_scenario = {"selected_bmps", "bmp_cost", "selected_reduction_target", "sel_pollutant", "target_pct", "manure_counties"};
+
     for (const auto& key : keys_to_check_scenario) {
         if (!json_obj_scenario.contains(key)) {
             std::cout << "The JSON object of the scenario file does not contain key '" << key << "'\n";
@@ -462,6 +463,8 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
     }
 
     std::vector<int> selected_bmps = json_obj_scenario["selected_bmps"].get<std::vector<int>>();
+    //manure_counties_ = json_obj_scenario["manure_counties"].get<std::vector<std::string>>();
+    manure_counties_ = {"43"};//Lancaster: Nelson
     std::unordered_map<std::string, double> updated_bmp_cost = json_obj_scenario["bmp_cost"].get<std::unordered_map<std::string, double>>();
 
 
@@ -473,7 +476,6 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
 
 
     std::unordered_map<std::string, std::vector<double>> phi_dict = json_obj["phi"].get<std::unordered_map<std::string, std::vector<double>>>();
-
 
     std::unordered_map<std::string, std::vector<std::vector<int>>> filtered_efficiency;
     std::vector<std::string> filtered_valid_ef_keys;
@@ -539,10 +541,23 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
 
 
 
+    //valid_lc_bmps_ = json_obj["valid_lc_bmps"].get<std::vector<std::string>>();
+    std::vector<std::string> accepted_lc_bmps;
+    //8, 13, 22, 
+    //accepted_lc_bmps = {"7", "8", "9", "11", "13", "17", "22", "61", "62", "66", "275", "276", "277", "278", "279", "280"};
+    //accepted_lc_bmps = {"7", "8", "9", "11", "12", "13", "15", "17", "18", "22", "61", "62", "65", "66", "140", "200", "275", "276", "277", "278", "280"};
+    accepted_lc_bmps = {"9", "12", "13", "15", "22", "200"};//, "140", "7"};
+    for (const auto& my_bmp: accepted_lc_bmps) {
+        auto int_my_bmp = std::stoi(my_bmp);
+            if (std::find(selected_bmps.begin(), selected_bmps.end(), int_my_bmp) != selected_bmps.end()) {
+                    valid_lc_bmps_.push_back(my_bmp);
+            }
+    }
 
+    //valid_lc_bmps_ = {"7", "9", "13"};
+    //accepted_lc_bmps_ = {"9", "11", "61", "62", "66", "275", "276", "277", "278", "279", "280"]
 
-    valid_lc_bmps_ = json_obj["valid_lc_bmps"].get<std::vector<std::string>>();
-    valid_lc_bmps_ = {"7", "9", "13"};
+    //Landuse Change': [7, 9, 11, 61, 62, 66, 275, 276, 277, 278, 279, 280], 
 
     auto land_conversion_from_bmp_to_tmp = json_obj["land_conversion_to"].get<std::unordered_map<std::string, std::vector<std::string>>>();
     for (const auto& [key, value] : land_conversion_from_bmp_to_tmp) {
@@ -564,7 +579,6 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
     //lrseg_ = json_obj["lrseg"].get<std::unordered_map<std::string, std::vector<int>>>();
     animal_complete_ = json_obj["animal_complete"].get<std::unordered_map<std::string, std::vector<int>>>();
     animal_ = json_obj["animal_unit"].get<std::unordered_map<std::string, double>>();
-    animal_complete_ = json_obj["animal_complete"].get<std::unordered_map<std::string, std::vector<int>>>();
     auto lrseg_tmp = json_obj["lrseg"].get<std::unordered_map<std::string, std::vector<int>>>();
     scenario_data_str_ = json_obj["scenario_data_str"].get<std::string>();
     //boost::replace_all(scenario_data_str_, "A", "38");

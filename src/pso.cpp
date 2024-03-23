@@ -376,6 +376,63 @@ void PSO::optimize() {
     //evaluate_ipopt_sols();
 }
 
+
+void PSO::update_pbest() {
+    for (int j = 0; j < nparts; j++) {
+        particles[j].update_pbest();
+    }
+
+}
+
+void PSO::exec_ipopt_all_sols(){
+    Execute execute;
+    int min_idx = 0;
+    int max_idx = 0; 
+    int mid_idx;
+    std::vector<double> values;
+
+    for (const auto& particle : gbest_) {
+        values.emplace_back(particle.get_fx()[0]);
+    }
+
+    // Step 1: Initialize a vector with indices 0 to values.size() - 1
+    std::vector<size_t> indices(values.size());
+    std::iota(indices.begin(), indices.end(), 0);
+
+    // Step 2: Sort the indices based on comparing values from the values vector
+    std::sort(indices.begin(), indices.end(),
+        [&values](size_t i1, size_t i2) { return values[i1] < values[i2]; });
+    //for (const auto& particle : gbest_) {
+    min_idx = indices[0];
+    max_idx = indices[indices.size() - 1];
+    mid_idx = indices[indices.size() / 2];
+    std::vector<int> idx_vec = {min_idx, mid_idx, max_idx};
+
+   for (const auto& idx : idx_vec) { 
+        auto lc_cost = gbest_[idx].get_lc_cost();
+        auto animal_cost = gbest_[idx].get_animal_cost();
+        auto manure_cost = gbest_[idx].get_manure_cost();
+        auto ipopt_uuid = gbest_[idx].get_uuid();
+        auto in_file = fmt::format("/opt/opt4cast/output/nsga3/{}/{}_reportloads.csv", emo_uuid_, ipopt_uuid);
+        execute.set_files(emo_uuid_, in_file);
+        execute.execute(emo_uuid_, 0.50, 6, 20);
+
+        fmt::print("Particle Selected Cost: {}\n", gbest_[idx].get_fx()[0]);
+        execute.update_output(emo_uuid_, gbest_[idx].get_fx()[0]);
+        fmt::print("======================== best_lc_cost_: {}\n", lc_cost);
+        fmt::print("======================== best_animal_cost_: {}\n", animal_cost);
+        fmt::print("======================== best_manure_cost_: {}\n", manure_cost);
+        std::string postfix;
+        if (idx == min_idx) postfix = "min";
+        else if (idx == max_idx) postfix = "max";
+        else postfix = "median";
+
+        std::string sub_dir = fmt::format("ipopt_results-all-sols-{}", postfix);
+        evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
+    }
+}
+
+
 void PSO::evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipopt_uuid, double animal_cost, double manure_cost) {
     
     std::vector<std::string> exec_uuid_vec;
@@ -458,66 +515,6 @@ void PSO::evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipo
     save(result_fx, fmt::format("{}/config/{}/pareto_front_ipopt.txt", emo_path, sub_dir));
     fmt::print("end\n");
 }
-
-void PSO::update_pbest() {
-    for (int j = 0; j < nparts; j++) {
-        particles[j].update_pbest();
-    }
-
-}
-
-void PSO::exec_ipopt_all_sols(){
-    Execute execute;
-    int min_idx = 0;
-    int max_idx = 0; 
-    int mid_idx;
-    std::vector<double> values;
-
-    for (const auto& particle : gbest_) {
-            values.emplace_back(particle.get_fx()[0]);
-    }
-
-    // Step 1: Initialize a vector with indices 0 to values.size() - 1
-    std::vector<size_t> indices(values.size());
-    std::iota(indices.begin(), indices.end(), 0);
-
-    // Step 2: Sort the indices based on comparing values from the values vector
-    std::sort(indices.begin(), indices.end(),
-        [&values](size_t i1, size_t i2) { return values[i1] < values[i2]; });
-    //for (const auto& particle : gbest_) {
-    min_idx = indices[0];
-    max_idx = indices[indices.size() - 1];
-    mid_idx = indices[indices.size() / 2];
-    std::vector<int> idx_vec = {min_idx, mid_idx, max_idx};
-
-   for (const auto& idx : idx_vec) { 
-        auto lc_cost = gbest_[idx].get_lc_cost();
-        auto animal_cost = gbest_[idx].get_animal_cost();
-        auto manure_cost = gbest_[idx].get_manure_cost();
-
-        auto json_filename = fmt::format("/opt/opt4cast/output/nsga3/{}/config/ipopt.json", emo_uuid_);
-        fs::remove(json_filename);
-        auto json_filename2 = fmt::format("/opt/opt4cast/output/nsga3/{}/config/ipopt2.json", emo_uuid_);
-        fs::remove(json_filename2);
-        auto ipopt_uuid = gbest_[idx].get_uuid();
-        auto in_file = fmt::format("/opt/opt4cast/output/nsga3/{}/{}_reportloads.csv", emo_uuid_, ipopt_uuid);
-        execute.set_files(emo_uuid_, in_file);
-        execute.execute(emo_uuid_, 0.20, 7, 20);
-        fmt::print("Particle Selected Cost: {}\n", gbest_[idx].get_fx()[0]);
-        execute.update_output(emo_uuid_, gbest_[idx].get_fx()[0]);
-        fmt::print("======================== best_lc_cost_: {}\n", lc_cost);
-        fmt::print("======================== best_animal_cost_: {}\n", animal_cost);
-        fmt::print("======================== best_manure_cost_: {}\n", manure_cost);
-        std::string postfix;
-        if (idx == min_idx) postfix = "min";
-        else if (idx == max_idx) postfix = "max";
-        else postfix = "median";
-
-        std::string sub_dir = fmt::format("ipopt_results-all-sols-{}", postfix);
-        evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
-    }
-}
-
 void PSO::exec_ipopt(){
     Execute execute;
     Particle particle_selected;
@@ -537,7 +534,7 @@ void PSO::exec_ipopt(){
     auto animal_cost = particle_selected.get_animal_cost();
     auto manure_cost = particle_selected.get_manure_cost();
     execute.set_files(emo_uuid_, in_file);
-    execute.execute(emo_uuid_, 0.20, 7, 20);
+    execute.execute(emo_uuid_, 0.50, 6, 20);
     fmt::print("Particle Selected Cost: {}\n", particle_selected.get_fx()[0]);
     execute.update_output(emo_uuid_, particle_selected.get_fx()[0]);
     fmt::print("======================== best_lc_cost_: {}\n", lc_cost);

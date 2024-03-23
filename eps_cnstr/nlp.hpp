@@ -11,6 +11,9 @@
 #include <sw/redis++/redis++.h>
 #include "IpTNLP.hpp"
 
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 using namespace Ipopt;
 
 /** C++ Example NLP for interfacing a problem with IPOPT.
@@ -28,7 +31,7 @@ public:
     bool has_content;
    /** Default constructor */
 
-   EPA_NLP(std::string filename_in, std::string filename_scenario ,std::string filename_out, double max_constr, int pollutant_id);
+    EPA_NLP(const json& base_scenario_json, const json& scenario_json, const json& uuids_json, const std::string& path_out, int pollutant_idx);
    /** Default destructor */
    virtual ~EPA_NLP();
 
@@ -203,7 +206,9 @@ private:
     void normalize_efficiency();
     //int compute_efficiency();
     void compute_eta();
-    void load(const std::string& filename, const std::string& filename_scenario);
+
+    void load(const json& base_scenario_json, const json& scenario_json, const json& uuids_json);
+
 
     size_t ef_size_;
 
@@ -213,9 +218,6 @@ private:
     std::vector<double> sum_load_invalid_;
     std::vector<double> sum_load_valid_;
 
-    std::string filename_in;
-    std::string filename_out;
-    std::string filename_scenario;
     std::vector<std::string> ef_keys_;
 
     std::unordered_map<std::string, double> amount_;
@@ -244,6 +246,7 @@ private:
     int current_iteration_;
 
     std::string scenario_data_;
+    std::string path_out_;
    //@}
 };
 

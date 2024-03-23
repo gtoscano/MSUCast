@@ -131,6 +131,7 @@ void Execute::update_output(const std::string& emo_uuid, double initial_cost) {
     process_file(filename_src, filename_dst, initial_cost);
 }
 
+
 void Execute::execute(const std::string& emo_uuid, 
         double ipopt_reduction, //0.30
         int cost_profile_idx, //state_id
@@ -140,17 +141,13 @@ void Execute::execute(const std::string& emo_uuid,
     int ipopt = 1;  //1
     int pollutant_idx = 0;//0 
             std::string env_var = "OPT4CAST_EPS_CNSTR_PATH";
-            std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr");
-            std::string filename_in = fmt::format("/opt/opt4cast/output/nsga3/{}/config/reportloads_processed.json", emo_uuid);
-            std::string filename_out = fmt::format("/opt/opt4cast/output/nsga3/{}/config/ipopt2.json", emo_uuid);;
-            std::string filename_scenario = fmt::format("/opt/opt4cast/output/nsga3/{}/config/scenario.json", emo_uuid);;;
-
-            std::string exec_string = fmt::format("{} {} {} {} {} {} {}",
-                                                  EPS_CNSTR_PATH, filename_in, filename_scenario, filename_out, pollutant_idx, 1.0-ipopt_reduction, ipopt_popsize);
+            std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/django/api4opt4/optimization/eps_cnstr/build/eps_cnstr");
+            std::string exec_string = fmt::format("{} {} {} {} {} {} {} {}",
+                                                  EPS_CNSTR_PATH, emo_uuid, ipopt_reduction, pollutant_idx, ipopt, limit_alpha, cost_profile_idx, ipopt_popsize);
             fmt::print("exec_string: {}\n", exec_string);
             using namespace my_execute;
             CommandResult nullbyteCommand = Command::exec(exec_string); // NOLINT(bugprone-string-literal-with-embedded-nul)
-            std::ofstream ofile(filename_out);
+            std::ofstream ofile("/tmp/filename2.txt");
             ofile<<exec_string<<std::endl;
             ofile << "Output using fread: " << nullbyteCommand << std::endl;
             ofile.close();

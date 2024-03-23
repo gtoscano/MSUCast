@@ -110,17 +110,17 @@ void from_json(const json &j, var_t &p) {
 }
 
 // constructor 63 0.9 0 1 0
-EPA_NLP::EPA_NLP(std::string filename_in, std::string filename_scenario, std::string filename_out, double max_constr, int pollutant_id) {
-    this->filename_in = filename_in;
-    this->filename_scenario = filename_scenario;
-    this->filename_out = filename_out;
-    load(filename_in, filename_scenario);
-    this-> pollutant_idx = pollutant_id;
+//
+EPA_NLP::EPA_NLP(const json& base_scenario_json, const json& scenario_json, const json& uuids_json, const std::string& path_out, int pollutant_idx){
+
+    this->path_out_ = path_out;
+    load(base_scenario_json, scenario_json, uuids_json);
+    this-> pollutant_idx = pollutant_idx;
     this->total_cost = 1.0;
     this->total_acres = 1.0;
     //read_global_files(prefix_file, pollutant_id);
     current_iteration_ = 0;
-    update_reduction(max_constr, current_iteration_);
+    //update_reduction(max_constr, current_iteration_);
     fmt::print("Max constr: {}, {}\n", this->max_constr, max_constr);
     has_content = false;
 }
@@ -320,61 +320,50 @@ std::vector<std::string> EPA_NLP::get_uuids() {
     return uuids_;
 }
 
-void EPA_NLP::load(const std::string& filename, const std::string& filename_scenario) {
+void EPA_NLP::load(const json& base_scenario_json, const json& scenario_json, const json& uuids_json) {
 
-    // Open the JSON file
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open the base scenario file: " << filename<<std::endl;
-        exit(-1);
-        return;
-    }
-
-
-    // Parse the JSON file directly into a nlohmann::json object
-    json json_obj = json::parse(file);
     std::vector<std::string> keys_to_check = {"amount", "phi", "efficiency", "lrseg", "bmp_cost", "u_u_group", "sum_load_valid", "sum_load_invalid", "ef_bmps", "scenario_data_str" };
     for (const auto& key : keys_to_check) {
-        if (!json_obj.contains(key)) {
+        if (!base_scenario_json.contains(key)) {
             std::cout << "The JSON object does not contain the key '" << key << "'\n";
             exit(-1);
         }
     }
-    scenario_data_ = json_obj["scenario_data_str"].get<std::string>();
+    scenario_data_ = base_scenario_json["scenario_data_str"].get<std::string>();
 
-    std::ifstream file_scenario(filename_scenario);
-    if (!file_scenario.is_open()) {
-        std::cerr << "Failed to open the scenario file: " << filename_scenario<<std::endl;
+
+    std::string key_to_check_uuids = "uuids";
+
+    if (!uuids_json.contains(key_to_check_uuids)) {
+        std::cout << "The JSON object of the uuids file does not contain key '" << key_to_check_uuids << "'\n";
         exit(-1);
-        return;
     }
 
-    // Parse the JSON file_scenario directly into a nlohmann::json object
-    json json_obj_scenario = json::parse(file_scenario);
+    uuids_ = uuids_json["uuids"].get<std::vector<std::string>>();
+    // End uuids
 
-    std::vector<std::string> keys_to_check_scenario = {"selected_bmps", "bmp_cost", "selected_reduction_target", "sel_pollutant", "target_pct", "uuid", "uuids"};
+
+    std::vector<std::string> keys_to_check_scenario = {"selected_bmps", "bmp_cost", "selected_reduction_target", "sel_pollutant", "target_pct", "uuid"};
 
     for (const auto& key : keys_to_check_scenario) {
-        if (!json_obj_scenario.contains(key)) {
+        if (!scenario_json.contains(key)) {
             std::cout << "The JSON object of the scenario file does not contain key '" << key << "'\n";
             exit(-1);
         }
     }
-
-    uuid_ = json_obj_scenario["uuid"].get<std::string>();
-    uuids_ = json_obj_scenario["uuids"].get<std::vector<std::string>>();
+    uuid_ = scenario_json["uuid"].get<std::string>();
 
 
-    std::vector<int> selected_bmps = json_obj_scenario["selected_bmps"].get<std::vector<int>>();
-    std::unordered_map<std::string, double> updated_bmp_cost = json_obj_scenario["bmp_cost"].get<std::unordered_map<std::string, double>>();
+    std::vector<int> selected_bmps = scenario_json["selected_bmps"].get<std::vector<int>>();
+    std::unordered_map<std::string, double> updated_bmp_cost = scenario_json["bmp_cost"].get<std::unordered_map<std::string, double>>();
 
 
     // Access the JSON data
-    amount_ = json_obj["amount"].get<std::unordered_map<std::string, double>>();
-    phi_dict_ = json_obj["phi"].get<std::unordered_map<std::string, std::vector<double>>>();
-    efficiency_ = json_obj["efficiency"].get<std::unordered_map<std::string, std::vector<std::vector<int>>>>();
+    amount_ = base_scenario_json["amount"].get<std::unordered_map<std::string, double>>();
+    phi_dict_ = base_scenario_json["phi"].get<std::unordered_map<std::string, std::vector<double>>>();
+    efficiency_ = base_scenario_json["efficiency"].get<std::unordered_map<std::string, std::vector<std::vector<int>>>>();
     
-    std::unordered_map<std::string, std::vector<double>> phi_dict = json_obj["phi"].get<std::unordered_map<std::string, std::vector<double>>>();
+    std::unordered_map<std::string, std::vector<double>> phi_dict = base_scenario_json["phi"].get<std::unordered_map<std::string, std::vector<double>>>();
 
     std::unordered_map<std::string, std::vector<std::vector<int>>> filtered_efficiency;
     std::vector<std::string> filtered_valid_ef_keys;
@@ -426,7 +415,7 @@ void EPA_NLP::load(const std::string& filename, const std::string& filename_scen
     }
     */
 
-    bmp_cost_ = json_obj["bmp_cost"].get<std::unordered_map<std::string, double>>();
+    bmp_cost_ = base_scenario_json["bmp_cost"].get<std::unordered_map<std::string, double>>();
     // replace bmp_cost with updated_bmp_cost 
     for (const auto&[key, val]: updated_bmp_cost) {
         if (bmp_cost_.find(key) != bmp_cost_.end()) {
@@ -435,14 +424,14 @@ void EPA_NLP::load(const std::string& filename, const std::string& filename_scen
         }
     }
 
-    lrseg_ = json_obj["lrseg"].get<std::unordered_map<std::string, std::vector<int>>>();
+    lrseg_ = base_scenario_json["lrseg"].get<std::unordered_map<std::string, std::vector<int>>>();
 
 
-    u_u_group_dict = json_obj["u_u_group"].get<std::unordered_map<std::string, int>>();
+    u_u_group_dict = base_scenario_json["u_u_group"].get<std::unordered_map<std::string, int>>();
 
 
-    sum_load_valid_ = json_obj["sum_load_valid"].get<std::vector<double>>();
-    sum_load_invalid_ = json_obj["sum_load_invalid"].get<std::vector<double>>();
+    sum_load_valid_ = base_scenario_json["sum_load_valid"].get<std::vector<double>>();
+    sum_load_invalid_ = base_scenario_json["sum_load_invalid"].get<std::vector<double>>();
     sum_load_valid_ = sum_load_valid;
     sum_load_invalid_ = sum_load_invalid;
 
@@ -961,8 +950,8 @@ void EPA_NLP::save_files(
         Index                      n,
         const Number *x
 ) {
-    auto filename = fmt::format("{}_reduced.csv", filename_out);
-    auto json_filename = fmt::format("{}.json", filename_out);
+    auto filename = fmt::format("{}/reduced.csv", path_out_);
+    auto json_filename = fmt::format("{}/produced_files.json", path_out_);
     //#auto json_filename2 = fmt::format("{}/output/nsga3/{}/config/ipopt2.json", msu_cbpo_path, prefix);
 
     json json_ipopt = {};
@@ -1377,7 +1366,7 @@ void EPA_NLP::write_files(
     std::cout << std::endl << "Final value of the constraints:" << std::endl;
 
 
-    std::string filename = fmt::format("{}_{}.csv", filename_out, current_iteration_);
+    std::string filename = fmt::format("{}/{}.csv", path_out_, current_iteration_);
     std::ofstream file(filename);
     file.precision(15);
 
@@ -1388,7 +1377,7 @@ void EPA_NLP::write_files(
     std::cout << "Original PLoadEos = " << sum_load_valid_[1] + sum_load_invalid_[1] << "\n";
     std::cout << "Original SLoadEos = " << sum_load_valid_[2] + sum_load_invalid_[2] << "\n";
 
-    filename = fmt::format("{}_results.txt", filename_out);
+    filename = fmt::format("{}/pareto_front.txt", path_out_);
     std::ofstream file_results(filename, std::ios::app);
     file_results.precision(15);
 
@@ -1439,7 +1428,7 @@ void EPA_NLP::write_files(
         }
     }
 
-    filename = fmt::format("{}_summary.txt", filename_out);
+    filename = fmt::format("{}/summary.txt", path_out_);
 
     std::ofstream file3(filename);
 
@@ -1452,9 +1441,9 @@ void EPA_NLP::write_files(
     std::cout << "# Bmps: " << counter << std::endl;
     file.close();
 
-    std::string filename_funcs= fmt::format("{}_funcs.txt", filename_out);
+    std::string filename_funcs= fmt::format("{}/funcs.txt", path_out_);
     std::ofstream file_funcs(filename_funcs, std::ios_base::app);
-    file_funcs.precision(10);
+    file_funcs.precision(15);
     file_funcs<< obj_value << "," << g_constr[0] << " "<<g_constr[1]<<" "<< g_constr[2]<< "\n";
     file_funcs.close();
 }
@@ -1481,10 +1470,10 @@ void EPA_NLP::finalize_solution(
     save_files(n, x);
     save_files2(n, x);
 
-    std::string out_filename = fmt::format("{}_{}_impbmpsubmittedland.parquet", filename_out, current_iteration_);
+    std::string out_filename = fmt::format("{}/{}_impbmpsubmittedland.parquet", path_out_, current_iteration_);
     fmt::print("Writing land file: {}\n", out_filename);
     write_land( ef_x_, out_filename );
-    std::string out_filename_json = fmt::format("{}_{}_impbmpsubmittedland.json", filename_out, current_iteration_); 
+    std::string out_filename_json = fmt::format("{}/{}_impbmpsubmittedland.json", path_out_, current_iteration_); 
     write_land_json( ef_x_, out_filename_json);
 
 
