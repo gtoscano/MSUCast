@@ -5,6 +5,9 @@
 #include "particle.h"
 #include "scenario.h" 
 #include "execute.h"
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 //#include "spdlog/spdlog.h"
 //#include "spdlog/sinks/stdout_color_sinks.h"
@@ -85,6 +88,8 @@ private:
     void delete_tmp_files();
 
     void evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipopt_uuid, double animal_cost, double manure_cost);
+
+    json get_n_uuids(int n);
     double best_lc_cost_;
     double best_animal_cost_;
     //std::shared_ptr<spdlog::logger> logger_;

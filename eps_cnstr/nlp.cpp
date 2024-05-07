@@ -1449,6 +1449,11 @@ void EPA_NLP::write_files(
 }
 
 
+void EPA_NLP::append_lc_x(const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x) {
+    for (const auto& entry: lc_x) {
+        lc_x_.push_back(entry);
+    }
+}
 // [TNLP_finalize_solution]
 void EPA_NLP::finalize_solution(
         SolverReturn status,
@@ -1472,11 +1477,17 @@ void EPA_NLP::finalize_solution(
 
     std::string out_filename = fmt::format("{}/{}_impbmpsubmittedland.parquet", path_out_, current_iteration_);
     fmt::print("Writing land file: {}\n", out_filename);
-    write_land( ef_x_, out_filename );
+    //copy ef_x_ to ef_x
+    std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> ef_x = ef_x_;
+    if (lc_x_.size() >0) {
+        //prepend lc_x_ to ef_x
+        ef_x.insert(ef_x.begin(), lc_x_.begin(), lc_x_.end());
+    }
+
+    write_land(ef_x, out_filename);
     std::string out_filename_json = fmt::format("{}/{}_impbmpsubmittedland.json", path_out_, current_iteration_); 
-    write_land_json( ef_x_, out_filename_json);
+    write_land_json( ef_x, out_filename_json);
 
 
 }
-
 

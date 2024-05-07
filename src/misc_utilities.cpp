@@ -10,7 +10,8 @@
 #include <ctime>
 #include <random>
 #include <fstream>
-
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
 
 namespace fs = std::filesystem;
 
@@ -159,6 +160,24 @@ namespace misc_utilities {
         } else {
             std::cout << "Directory already exists. Doing nothing." << std::endl;
         }
+    }
+
+    json read_json_file(const std::string& filename) {
+        // Open the JSON file
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open the base scenario file: " << filename << std::endl;
+            exit(-1);
+        }
+    
+        // Parse the JSON file directly into a nlohmann::json object
+        json json_obj;
+        try {
+            json_obj = json::parse(file);
+        } catch (const json::parse_error& e) {
+            throw std::runtime_error("Failed to parse JSON file: " + filename + "; error: " + e.what());
+        }
+        return json_obj;
     }
 
     /*

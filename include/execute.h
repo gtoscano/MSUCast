@@ -15,6 +15,8 @@ class Execute {
         int cost_profile_idx, //state_id
         int ipopt_popsize //10
         ); 
+
+        void get_json_scenario( int sinfo, const std::string& report_loads_path, const std::string& output_path_prefix);
         void update_output(const std::string& emo_uuid, double initial_cost);
 
         bool process_file(const std::string& source_path, const std::string& destination_path, float initial_cost);

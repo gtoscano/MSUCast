@@ -179,6 +179,7 @@ public:
     std::string get_scenario_data();
     std::vector<std::string> get_uuids();
     std::string get_uuid();
+    void append_lc_x(const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x);
 private:
    /**@name Methods to block default compiler methods.
     *
@@ -236,6 +237,7 @@ private:
     std::unordered_map<int, std::vector<int> > limit_vars_dict;
 
     std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> ef_x_;
+    std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> lc_x_;
     std::string uuid_;
     std::vector<std::string> uuids_;
 

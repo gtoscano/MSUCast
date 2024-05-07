@@ -953,16 +953,15 @@ double Scenario::normalize_manure(const std::vector<double>& x, std::vector<std:
         }
 
         double pct_accum = 0.0;
-        //fmt::format("grp_tmp: {}\n", grp_tmp.size());
         for (auto [pct, neighbor_to]: grp_tmp) {
-            //double norm_pct =  (double) pct / sum;
 
             double norm_pct =  (MAX_PCT_MANURE_BMP*pct) / sum;
             if (norm_pct * manure_dry_lbs_[key] > 1.0) {
                 double amount = (norm_pct * manure_dry_lbs_[key]);
-                double moisture = 0.7;
-                amount = amount / (1.0 - moisture); //convert to wet pounds 
+                //double moisture = 0.7;
+                //amount = amount / (1.0 - moisture); //convert to wet pounds 
                 amount = amount / 2000.0; //convert to wet tons
+                                          //convert to dry tons
                 auto state = counties_[county];
                 std::string key_bmp_cost = fmt::format("{}_{}", state, bmp);
                 double cost = amount * bmp_cost_[key_bmp_cost];

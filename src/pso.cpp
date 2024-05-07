@@ -383,6 +383,35 @@ void PSO::update_pbest() {
     }
 
 }
+std::vector<std::string> PSO::generate_n_uuids(int n) {
+    std::vector<std::string> uuids;
+    for (int i = 0; i < n; i++) {
+        uuids.push_back(xg::newGuid().str());
+    }
+    return uuids;
+}
+void PSO::copy_parquet_files_for_ipopt(const std::string& path, const std::string& parent_uuid, const std::vector<std::string>& uuids) {
+    for (const auto& uuid : uuids) {
+        /*
+        auto land_src = fmt::format("{}/{}_impbmpsubmittedland.parquet", path, parent_uuid);
+        if(fs::exists(land_src)){
+            auto land_dst = fmt::format("{}/{}_impbmpsubmittedland.parquet", path, uuid);
+            misc_utilities::copy_file(land_src, land_dst);
+        }
+        */
+
+        auto animal_src = fmt::format("{}/{}_impbmpsubmittedanimal.parquet", path, parent_uuid);
+        if(fs::exists(animal_src)){
+            auto animal_dst = fmt::format("{}/{}_impbmpsubmittedanimal.parquet", path, uuid);
+            misc_utilities::copy_file(animal_src, animal_dst);
+        }
+        auto manure_dst = fmt::format("{}/{}_impbmpsubmittedmanuretransport.parquet", path, parent_uuid);
+        if (fs::exists(manure_dst)) {
+            auto manure_dst = fmt::format("{}/{}_impbmpsubmittedmanuretransport.parquet", path, uuid);
+            misc_utilities::copy_file(manure_src, manure_dst);
+        }
+    }
+} 
 
 void PSO::exec_ipopt_all_sols(){
     Execute execute;
@@ -407,15 +436,16 @@ void PSO::exec_ipopt_all_sols(){
     max_idx = indices[indices.size() - 1];
     mid_idx = indices[indices.size() / 2];
     std::vector<int> idx_vec = {min_idx, mid_idx, max_idx};
+    path = fmt::format("/opt/opt4cast/output/nsga3/{}", emo_uuid_);
+    json scenario_json read_json_file(fmt::format("{}/scenario.json", path));
 
    for (const auto& idx : idx_vec) { 
         auto lc_cost = gbest_[idx].get_lc_cost();
         auto animal_cost = gbest_[idx].get_animal_cost();
         auto manure_cost = gbest_[idx].get_manure_cost();
-        auto ipopt_uuid = gbest_[idx].get_uuid();
-        auto in_file = fmt::format("/opt/opt4cast/output/nsga3/{}/{}_reportloads.csv", emo_uuid_, ipopt_uuid);
-        execute.set_files(emo_uuid_, in_file);
-        execute.execute(emo_uuid_, 0.50, 6, 20);
+        auto parent_uuid = gbest_[idx].get_uuid();
+        //execute.set_files(emo_uuid_, in_file);
+        //execute.execute(emo_uuid_, 0.50, 6, 20);
 
         fmt::print("Particle Selected Cost: {}\n", gbest_[idx].get_fx()[0]);
         execute.update_output(emo_uuid_, gbest_[idx].get_fx()[0]);
@@ -426,9 +456,25 @@ void PSO::exec_ipopt_all_sols(){
         if (idx == min_idx) postfix = "min";
         else if (idx == max_idx) postfix = "max";
         else postfix = "median";
+        std::string out_path = fmt::format("{}/ipopt_results-all-sols-{}", path, postfix);
 
-        std::string sub_dir = fmt::format("ipopt_results-all-sols-{}", postfix);
-        evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
+        auto uuids = get_n_uuids(ipopt_popsize);
+        int sinfo = 0;
+        std::string report_loads_path = fmt::format("{}/{}_reportloads.csv", path, parent_uuid);
+        std::string output_path_prefix = fmt::format("{}/{}", path, parent_uuid);
+
+        execute.get_json_scenario( sinfo, report_loads_path, output_path_prefix);
+
+        copy_parquet_files_for_ipopt(path, parent_uuid, uuids);
+
+        json base_scenario_json read_json_file(fmt::format("{}/reportloads_processed.json", path));
+        json uuids_json;
+        uuids_json["uuids"] = uuids;
+        int pollutant_idx = 0;
+        double ipopt_reduction = 0.50;
+        int ipopt_popsize = 10;
+        //evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
+        EpsConstraint eps_constr(base_scenario_json, scenario_json, uuids_json, path_out, pollutant_idx, evaluate_cast);
     }
 }
 
@@ -515,6 +561,9 @@ void PSO::evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipo
     save(result_fx, fmt::format("{}/config/{}/pareto_front_ipopt.txt", emo_path, sub_dir));
     fmt::print("end\n");
 }
+
+
+//std::vector<Particle> gbest_;
 void PSO::exec_ipopt(){
     Execute execute;
     Particle particle_selected;
@@ -542,6 +591,7 @@ void PSO::exec_ipopt(){
     fmt::print("======================== best_manure_cost_: {}\n", manure_cost);
     std::string sub_dir = "ipopt_results";
     evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
+
 }
 
 /*
