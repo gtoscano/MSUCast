@@ -131,8 +131,35 @@ void Execute::update_output(const std::string& emo_uuid, double initial_cost) {
     process_file(filename_src, filename_dst, initial_cost);
 }
 
+void Execute::execute(const std::string& emo_uuid, 
+        const std::string& path,
+        double ipopt_reduction, //0.30
+        int cost_profile_idx, //state_id
+        int ipopt_popsize //10
+        ) {
+    int limit_alpha = 1;
+    int ipopt = 1;  //1
+    int pollutant_idx = 0;//0 
+            std::string env_var = "OPT4CAST_EPS_CNSTR_PATH";
+            //std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/django/api4opt4/optimization/eps_cnstr/build/eps_cnstr");
+            std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr");
+            auto report_loads="/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/reportloads_processed.json";
+            auto scenario = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/scenario.json";
+            auto uuids = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/uuids.json";
+            auto front = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/front";
+            //0 0.7 20
+            std::string exec_string = fmt::format("{} {} {} {} {} {} {} {}",
+                                                  EPS_CNSTR_PATH, emo_uuid, ipopt_reduction, pollutant_idx, ipopt, limit_alpha, cost_profile_idx, ipopt_popsize);
+            fmt::print("exec_string: {}\n", exec_string);
+            using namespace my_execute;
+            CommandResult nullbyteCommand = Command::exec(exec_string); // NOLINT(bugprone-string-literal-with-embedded-nul)
+            std::ofstream ofile("/tmp/filename2.txt");
+            ofile<<exec_string<<std::endl;
+            ofile << "Output using fread: " << nullbyteCommand << std::endl;
+            ofile.close();
+}
 
-void Execute::execute(
+void Execute::execute_local(
         const std::string& in_path,
         const std::string& out_path,
         int pollutant_idx, //0
@@ -147,11 +174,11 @@ void Execute::execute(
     std::string scenario_json_path = fmt::format("{}/scenario.json", in_path);;;
     std::string uuids_json_path = fmt::format("{}/uuids.json", in_path);;;
     std::string exec_string = fmt::format("{} {} {} {} {} {}", 
-                OPT4CAST_RUN_EPS_CNSTR_PATH, 
+                EPS_CNSTR_PATH, 
                 reportloads_json_path, 
                 scenario_json_path, 
                 uuids_json_path, 
-                pfront_path, 
+                //pfront_path, 
                 pollutant_idx,
                 ipopt_reduction, 
                 ipopt_popsize);
@@ -173,13 +200,13 @@ void Execute::get_json_scenario(
 
     std::string OPT4CAST_MAKE_SCENARIO_FILE_PATH = misc_utilities::get_env_var("OPT4CAST_MAKE_SCENARIO_FILE_PATH", "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test");
     
-    OPTCAST_MAKE_SCENARIO_FILE_PATH = "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test";
+    OPT4CAST_MAKE_SCENARIO_FILE_PATH = "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test";
 
     std::string exec_string = fmt::format("{} {} {} {}", 
                 OPT4CAST_MAKE_SCENARIO_FILE_PATH, 
                 sinfo, 
                 report_loads_path, 
-                fmt::format("{}_reportloads_processed.json", output_path_prefix),
+                fmt::format("{}_reportloads_processed.json", output_path_prefix)
                 );
 
     fmt::print("exec_string: {}\n", exec_string);

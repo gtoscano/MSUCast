@@ -6,7 +6,7 @@
 #define CBO_EVALUATION_MISC_UTILITIES_H
 
 #include <vector>
-
+#include <nlohmann/json.hpp>
 namespace misc_utilities {
     /**
     * reads environment variables
@@ -35,6 +35,8 @@ namespace misc_utilities {
 
     double rand_double(double lower_bound, double upper_bound);
     void mkdir(std::string dir_path);
+
+    nlohmann::json read_json_file(const std::string& filename);
 }
 
 #endif //CBO_EVALUATION_MISC_UTILITIES_H

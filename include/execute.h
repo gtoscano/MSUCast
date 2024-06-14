@@ -16,6 +16,14 @@ class Execute {
         int ipopt_popsize //10
         ); 
 
+        void execute_local(
+            const std::string& in_path,
+            const std::string& out_path,
+            int pollutant_idx, //0
+            double ipopt_reduction, //0.30
+            int ipopt_popsize //10
+        );
+
         void get_json_scenario( int sinfo, const std::string& report_loads_path, const std::string& output_path_prefix);
         void update_output(const std::string& emo_uuid, double initial_cost);
 

@@ -26,6 +26,10 @@ public:
     void init();
     void optimize();
     void print();
+
+    std::vector<std::string> generate_n_uuids(int n);
+
+    void copy_parquet_files_for_ipopt(const std::string& path, const std::string& parent_uuid, const std::vector<std::string>& uuids);
     std::vector<std::vector<double>> get_gbest_x() {
         return gbest_x;
     }
@@ -89,7 +93,6 @@ private:
 
     void evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipopt_uuid, double animal_cost, double manure_cost);
 
-    json get_n_uuids(int n);
     double best_lc_cost_;
     double best_animal_cost_;
     //std::shared_ptr<spdlog::logger> logger_;
