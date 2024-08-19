@@ -13,6 +13,15 @@ add_executable(execute
     exec_test.cpp 
     )
 
+add_executable(merge_parquet_files
+    merge_parquet_files.cpp 
+    ${SOURCE_DIR}/misc_utilities.cpp
+    )
+
+add_executable(merge_csv_files
+    merge_csv_files.cpp 
+    )
+
 add_executable(pso_test
     pso_test.cpp 
     ${SOURCE_DIR}/external_archive.cpp
@@ -27,6 +36,10 @@ add_executable(ipopt_json_test
 add_executable(scenario_test
     scenario_test.cpp 
 )
+
+target_link_libraries(merge_parquet_files PRIVATE arrow parquet fmt pthread)
+
+target_link_libraries(merge_csv_files PRIVATE arrow parquet fmt pthread)
 
 target_link_libraries(ipopt_json_test PRIVATE msucast arrow parquet fmt pthread crossguid hiredis redis++ SimpleAmqpClient)
 

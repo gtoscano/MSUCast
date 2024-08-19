@@ -99,7 +99,7 @@ bool Execute::process_file(const std::string& source_path, const std::string& de
 
     // Check if the files are open successfully
     if (!infile.is_open() || !outfile.is_open()) {
-        std::cerr << "Error opening files" << std::endl;
+        std::cerr << "Error opening files: " << source_path<< " "<< destination_path<<std::endl;
         return false;
     }
 
@@ -131,32 +131,36 @@ void Execute::update_output(const std::string& emo_uuid, double initial_cost) {
     process_file(filename_src, filename_dst, initial_cost);
 }
 
+
+void Execute::execute(const std::string& emo_uuid, double ipopt_reduction, int cost_profile_idx, int ipopt_popsize ) {
+    /*
 void Execute::execute(const std::string& emo_uuid, 
         const std::string& path,
         double ipopt_reduction, //0.30
         int cost_profile_idx, //state_id
         int ipopt_popsize //10
         ) {
+        */
     int limit_alpha = 1;
     int ipopt = 1;  //1
     int pollutant_idx = 0;//0 
-            std::string env_var = "OPT4CAST_EPS_CNSTR_PATH";
-            //std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/django/api4opt4/optimization/eps_cnstr/build/eps_cnstr");
-            std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr");
-            auto report_loads="/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/reportloads_processed.json";
-            auto scenario = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/scenario.json";
-            auto uuids = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/uuids.json";
-            auto front = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/front";
-            //0 0.7 20
-            std::string exec_string = fmt::format("{} {} {} {} {} {} {} {}",
-                                                  EPS_CNSTR_PATH, emo_uuid, ipopt_reduction, pollutant_idx, ipopt, limit_alpha, cost_profile_idx, ipopt_popsize);
-            fmt::print("exec_string: {}\n", exec_string);
-            using namespace my_execute;
-            CommandResult nullbyteCommand = Command::exec(exec_string); // NOLINT(bugprone-string-literal-with-embedded-nul)
-            std::ofstream ofile("/tmp/filename2.txt");
-            ofile<<exec_string<<std::endl;
-            ofile << "Output using fread: " << nullbyteCommand << std::endl;
-            ofile.close();
+    std::string env_var = "OPT4CAST_EPS_CNSTR_PATH";
+    //std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/django/api4opt4/optimization/eps_cnstr/build/eps_cnstr");
+    std::string EPS_CNSTR_PATH = misc_utilities::get_env_var(env_var, "/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr");
+    auto report_loads="/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/reportloads_processed.json";
+    auto scenario = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/scenario.json";
+    auto uuids = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/config/uuids.json";
+    auto front = "/opt/opt4cast/output/nsga3/592e98d5-2d52-4d25-99cb-76f88a6d4e09/front";
+    //0 0.7 20
+    std::string exec_string = fmt::format("{} {} {} {} {} {} {} {}",
+                                          EPS_CNSTR_PATH, emo_uuid, ipopt_reduction, pollutant_idx, ipopt, limit_alpha, cost_profile_idx, ipopt_popsize);
+    fmt::print("exec_string: {}\n", exec_string);
+    using namespace my_execute;
+    CommandResult nullbyteCommand = Command::exec(exec_string); // NOLINT(bugprone-string-literal-with-embedded-nul)
+    std::ofstream ofile("/tmp/filename2.txt");
+    ofile<<exec_string<<std::endl;
+    ofile << "Output using fread: " << nullbyteCommand << std::endl;
+    ofile.close();
 }
 
 void Execute::execute_local(
@@ -173,15 +177,17 @@ void Execute::execute_local(
     std::string reportloads_json_path = fmt::format("{}/reportloads_processed.json", in_path);
     std::string scenario_json_path = fmt::format("{}/scenario.json", in_path);;;
     std::string uuids_json_path = fmt::format("{}/uuids.json", in_path);;;
-    std::string exec_string = fmt::format("{} {} {} {} {} {}", 
+    std::string exec_string = fmt::format("{} {} {} {} {} {} {} {} {}", 
                 EPS_CNSTR_PATH, 
                 reportloads_json_path, 
                 scenario_json_path, 
-                uuids_json_path, 
-                //pfront_path, 
+                out_path, 
                 pollutant_idx,
                 ipopt_reduction, 
-                ipopt_popsize);
+                ipopt_popsize,
+                1,
+                uuids_json_path 
+                );
 
     fmt::print("exec_string: {}\n", exec_string);
     using namespace my_execute;
@@ -192,8 +198,42 @@ void Execute::execute_local(
     ofile.close();
 }
 
+void Execute::execute_new(
+        const std::string& base_scenario,
+        const std::string& scenario,
+        const std::string& out_path,
+        int pollutant_idx, //0
+        double ipopt_reduction, //0.30
+        int nsteps,
+        int evaluate_cast,
+        std::string original_base_scenario
+        ) {
+    std::string env_var = "OPT4CAST_EPS_CNSTR_PATH";
+    std::string EPS_CNSTR_PATH = misc_utilities::get_env_var("OPT4CAST_RUN_EPS_CNSTR_PATH", "/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr");
+    // const std::string& emo_uuid, 
+    // std::string path = fmt::format("/opt/opt4cast/output/nsga3/{}/config/", emo_uuid);
+    std::string exec_string = fmt::format("{} {} {} {} {} {} {} {} {}", 
+                EPS_CNSTR_PATH, 
+                base_scenario,
+                scenario,
+                out_path,
+                pollutant_idx,
+                ipopt_reduction,
+                nsteps,
+                evaluate_cast,
+                original_base_scenario
+                );
+
+    fmt::print("exec_string: {}\n", exec_string);
+    using namespace my_execute;
+    CommandResult nullbyteCommand = Command::exec(exec_string); // NOLINT(bugprone-string-literal-with-embedded-nul)
+    std::ofstream ofile(fmt::format("{}/filename2.txt", out_path));
+    ofile<<exec_string<<std::endl;
+    ofile << "Output using fread: " << nullbyteCommand << std::endl;
+    ofile.close();
+}
 void Execute::get_json_scenario(
-        int sinfo,
+        size_t sinfo,
         const std::string& report_loads_path,
         const std::string& output_path_prefix
         ) {

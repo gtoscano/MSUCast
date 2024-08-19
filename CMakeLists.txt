@@ -4,10 +4,13 @@ cmake_minimum_required(VERSION 3.10)
 project(MSUCast)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(crossguid CONFIG REQUIRED)
-find_package(Arrow REQUIRED)
+find_package(Arrow CONFIG REQUIRED)
+find_package(Parquet CONFIG REQUIRED)
 find_package(Parquet REQUIRED)
+find_package(PkgConfig)
 
 # Specify the directories where the source and header files are located
 set(SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
@@ -40,7 +43,7 @@ add_library(msucast ${LIB_BASE_SRC} ${LIB_BASE_HEADERS})
 
 target_include_directories(msucast PUBLIC include)
 target_compile_features(msucast PUBLIC cxx_std_20)
-target_link_libraries(msucast PRIVATE arrow parquet fmt pthread crossguid hiredis redis++ SimpleAmqpClient Threads::Threads)
+target_link_libraries(msucast PRIVATE arrow_shared parquet fmt pthread crossguid hiredis redis++ SimpleAmqpClient Threads::Threads)
 # Include directories (add the path where external_archive.h is located)
 
 include_directories(${INCLUDE_DIR})
@@ -56,7 +59,7 @@ add_executable(pso
 )
 
 target_include_directories(pso PUBLIC include)
-target_link_libraries(pso PRIVATE msucast arrow parquet fmt pthread crossguid hiredis redis++ SimpleAmqpClient)
+target_link_libraries(pso PRIVATE msucast arrow_shared parquet fmt pthread crossguid hiredis redis++ SimpleAmqpClient)
 
 add_subdirectory(test)
 add_subdirectory(eps_cnstr)

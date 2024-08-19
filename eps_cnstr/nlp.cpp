@@ -1,4 +1,6 @@
 #include "nlp.hpp"
+
+#include <crossguid/guid.hpp>
 #include <sys/stat.h>
 #include <cassert>
 #include <iostream>
@@ -25,18 +27,17 @@
 #include <parquet/exception.h>
 #include <parquet/stream_writer.h>
 
-#include <arrow/api.h>
-#include <arrow/io/file.h>
-#include <arrow/io/memory.h>
-#include <arrow/ipc/reader.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
 
 #include <arrow/api.h>
 #include <arrow/io/api.h>
+#include <arrow/io/file.h>
+#include <arrow/io/memory.h>
 #include <arrow/csv/api.h>
 #include <arrow/csv/writer.h>
 #include <arrow/ipc/api.h>
+#include <arrow/ipc/reader.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/table.h>
@@ -111,10 +112,10 @@ void from_json(const json &j, var_t &p) {
 
 // constructor 63 0.9 0 1 0
 //
-EPA_NLP::EPA_NLP(const json& base_scenario_json, const json& scenario_json, const json& uuids_json, const std::string& path_out, int pollutant_idx){
+EPA_NLP::EPA_NLP(const json& base_scenario_json, const json& scenario_json, const std::string& path_out, int pollutant_idx){
 
     this->path_out_ = path_out;
-    load(base_scenario_json, scenario_json, uuids_json);
+    load(base_scenario_json, scenario_json);
     this-> pollutant_idx = pollutant_idx;
     this->total_cost = 1.0;
     this->total_acres = 1.0;
@@ -316,11 +317,7 @@ std::string EPA_NLP::get_uuid() {
 }
 
 
-std::vector<std::string> EPA_NLP::get_uuids() {
-    return uuids_;
-}
-
-void EPA_NLP::load(const json& base_scenario_json, const json& scenario_json, const json& uuids_json) {
+void EPA_NLP::load(const json& base_scenario_json, const json& scenario_json) {
 
     std::vector<std::string> keys_to_check = {"amount", "phi", "efficiency", "lrseg", "bmp_cost", "u_u_group", "sum_load_valid", "sum_load_invalid", "ef_bmps", "scenario_data_str" };
     for (const auto& key : keys_to_check) {
@@ -332,15 +329,6 @@ void EPA_NLP::load(const json& base_scenario_json, const json& scenario_json, co
     scenario_data_ = base_scenario_json["scenario_data_str"].get<std::string>();
 
 
-    std::string key_to_check_uuids = "uuids";
-
-    if (!uuids_json.contains(key_to_check_uuids)) {
-        std::cout << "The JSON object of the uuids file does not contain key '" << key_to_check_uuids << "'\n";
-        exit(-1);
-    }
-
-    uuids_ = uuids_json["uuids"].get<std::vector<std::string>>();
-    // End uuids
 
 
     std::vector<std::string> keys_to_check_scenario = {"selected_bmps", "bmp_cost", "selected_reduction_target", "sel_pollutant", "target_pct", "uuid"};
@@ -351,7 +339,9 @@ void EPA_NLP::load(const json& base_scenario_json, const json& scenario_json, co
             exit(-1);
         }
     }
-    uuid_ = scenario_json["uuid"].get<std::string>();
+    //uuid_ = scenario_json["uuid"].get<std::string>();
+
+    uuid_ = xg::newGuid().str();
 
 
     std::vector<int> selected_bmps = scenario_json["selected_bmps"].get<std::vector<int>>();
@@ -1013,176 +1003,55 @@ void EPA_NLP::save_files(
     ofile.close();
 }
 
-/*
-int write_land2(
-        const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x,
-        const std::string& out_filename
-) {
-    std::shared_ptr<arrow::Schema> schema = arrow::schema ({
-                                                                   arrow::field("BmpSubmittedId", arrow::int32()),
-                                                                   arrow::field("AgencyId", arrow::int32()),
-                                                                   arrow::field("StateUniqueIdentifier", arrow::utf8()), //it can be binary
-                                                                   arrow::field("StateId", arrow::int32()),
-                                                                   arrow::field("BmpId", arrow::int32()),
-                                                                   arrow::field("GeographyId", arrow::int32()),
-                                                                   arrow::field("LoadSourceGroupId", arrow::int32()),
-                                                                   arrow::field("UnitId", arrow::int32()),
-                                                                   arrow::field("Amount", arrow::float64()),
-                                                                   arrow::field("IsValid", arrow::boolean()),
-                                                                   arrow::field("ErrorMessage", arrow::utf8()),//it can be binary
-                                                                   arrow::field("RowIndex", arrow::int32()),
-                                                           });
-    std::unordered_map<int, double> bmp_sum;
-    arrow::Int32Builder bmp_submitted_id;
-    arrow::Int32Builder agency_id;
-    arrow::StringBuilder state_unique_identifier;
-    arrow::Int32Builder state_id;
-    arrow::Int32Builder bmp_id;
-    arrow::Int32Builder geography_id;
-    arrow::Int32Builder load_source_id;
-    arrow::Int32Builder unit_id_builder;
-    arrow::DoubleBuilder amount_builder;
-    arrow::BooleanBuilder is_valid;
-    arrow::StringBuilder error_message;
-    arrow::Int32Builder row_index;
-
-
-    std::shared_ptr<arrow::io::FileOutputStream> outfile;
-
-    PARQUET_ASSIGN_OR_THROW(
-            outfile,
-            arrow::io::FileOutputStream::Open(out_filename));
-
-    parquet::WriterProperties::Builder builder;
-    //builder.compression(parquet::Compression::ZSTD);
-    builder.version(parquet::ParquetVersion::PARQUET_1_0);
-
-    std::shared_ptr<parquet::schema::GroupNode> my_schema;
-
-    parquet::schema::NodeVector fields;
-
-
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "BmpSubmittedId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "AgencyId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "StateUniqueIdentifier", parquet::Repetition::REQUIRED, parquet::Type::BYTE_ARRAY, parquet::ConvertedType::UTF8
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "StateId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "BmpId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "GeographyId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "LoadSourceGroupId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "UnitId", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "Amount", parquet::Repetition::REQUIRED, parquet::Type::DOUBLE
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "IsValid", parquet::Repetition::REQUIRED, parquet::Type::BOOLEAN
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "ErrorMessage", parquet::Repetition::REQUIRED, parquet::Type::BYTE_ARRAY, parquet::ConvertedType::UTF8
-    ));
-    fields.push_back(parquet::schema::PrimitiveNode::Make(
-            "RowIndex", parquet::Repetition::REQUIRED, parquet::Type::INT32, parquet::ConvertedType::INT_32
-    ));
-
-    my_schema = std::static_pointer_cast<parquet::schema::GroupNode>(
-            parquet::schema::GroupNode::Make("schema", parquet::Repetition::REQUIRED, fields));
-
-    parquet::StreamWriter os{
-            parquet::ParquetFileWriter::Open(outfile, my_schema, builder.build())};
-
-    int idx = 0;
-    int counter = 0;
-    for (const auto& entry : lc_x) {
-        auto [lrseg, agency, load_src, bmp, amount, load_src_grp, geography, state, unit] = entry;
-        os<<counter+1<<agency<<fmt::format("SU{}",counter)<<state<<bmp<<geography<<load_src_grp<<unit<<amount<<true<<""<<counter+1<<parquet::EndRow;
-        counter++;
+std::vector<std::tuple<int, int, int, int, int, int, double>> EPA_NLP::read_land(const std::string& filename) {
+    // AgencyId, StateId, BmpId, GeographyId, LoadSourceGroupId, UnitId, Amount 
+    std::vector<std::tuple<int, int, int, int, int, int, double> > result;
+    if (!fs::exists(filename)) {
+        return result;
     }
 
+    // Open Parquet file
+    std::shared_ptr<arrow::io::ReadableFile> infile;
+    PARQUET_ASSIGN_OR_THROW(infile, arrow::io::ReadableFile::Open(filename));
+    
+    // Create Parquet file reader
+    std::unique_ptr<parquet::arrow::FileReader> arrow_reader;
+    PARQUET_THROW_NOT_OK(parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &arrow_reader));
+    
+    // Read the table from the file
+    std::shared_ptr<arrow::Table> table;
+    PARQUET_THROW_NOT_OK(arrow_reader->ReadTable(&table));
+    
+    // Retrieve columns
+    auto agency_id = std::static_pointer_cast<arrow::Int32Array>(table->column(1)->chunk(0));
+    auto state_id = std::static_pointer_cast<arrow::Int32Array>(table->column(3)->chunk(0));
+    auto bmp_id = std::static_pointer_cast<arrow::Int32Array>(table->column(4)->chunk(0));
+    auto geography_id = std::static_pointer_cast<arrow::Int32Array>(table->column(5)->chunk(0));
+    auto load_source_group_id = std::static_pointer_cast<arrow::Int32Array>(table->column(6)->chunk(0));
+    auto unit_id = std::static_pointer_cast<arrow::Int32Array>(table->column(7)->chunk(0));
+    auto amount = std::static_pointer_cast<arrow::DoubleArray>(table->column(8)->chunk(0));
 
-    std::vector<std::shared_ptr<arrow::Array> > schema_values;
+    // Iterate over the rows and store in result vector
+    for (int64_t i = 0; i < table->num_rows(); ++i) {
+        result.emplace_back(
+            agency_id->Value(i),
+            state_id->Value(i),
+            bmp_id->Value(i),
+            geography_id->Value(i),
+            load_source_group_id->Value(i),
+            unit_id->Value(i),
+            amount->Value(i)
+        );
+    }
+    return result;
 
-    std::shared_ptr<arrow::Array> bmp_submitted_id_array;
-    PARQUET_THROW_NOT_OK(bmp_submitted_id.Finish(&bmp_submitted_id_array));
-    schema_values.push_back(bmp_submitted_id_array);
-
-    std::shared_ptr<arrow::Array> agency_id_array;
-    PARQUET_THROW_NOT_OK(agency_id.Finish(&agency_id_array));
-    schema_values.push_back(agency_id_array);
-
-    std::shared_ptr<arrow::Array> state_unique_identifier_array;
-    PARQUET_THROW_NOT_OK(state_unique_identifier.Finish(&state_unique_identifier_array));
-    schema_values.push_back(state_unique_identifier_array);
-
-    std::shared_ptr<arrow::Array> state_id_array;
-    PARQUET_THROW_NOT_OK(state_id.Finish(&state_id_array));
-    schema_values.push_back(state_id_array);
-
-    std::shared_ptr<arrow::Array> bmp_id_array;
-    PARQUET_THROW_NOT_OK(bmp_id.Finish(&bmp_id_array));
-    schema_values.push_back(bmp_id_array);
-
-    std::shared_ptr<arrow::Array> geography_id_array;
-    PARQUET_THROW_NOT_OK(geography_id.Finish(&geography_id_array));
-    schema_values.push_back(geography_id_array);
-
-    std::shared_ptr<arrow::Array> load_source_id_array;
-    PARQUET_THROW_NOT_OK(load_source_id.Finish(&load_source_id_array));
-    schema_values.push_back(load_source_id_array);
-
-    std::shared_ptr<arrow::Array> unit_id_array;
-    PARQUET_THROW_NOT_OK(unit_id_builder.Finish(&unit_id_array));
-    schema_values.push_back(unit_id_array);
-
-    std::shared_ptr<arrow::Array> amount_array;
-    PARQUET_THROW_NOT_OK(amount_builder.Finish(&amount_array));
-    schema_values.push_back(amount_array);
-
-    std::shared_ptr<arrow::Array> is_valid_array;
-    PARQUET_THROW_NOT_OK(is_valid.Finish(&is_valid_array));
-    schema_values.push_back(is_valid_array);
-
-    std::shared_ptr<arrow::Array> error_message_array;
-    PARQUET_THROW_NOT_OK(error_message.Finish(&error_message_array));
-    schema_values.push_back(error_message_array);
-
-    std::shared_ptr<arrow::Array> row_index_array;
-    PARQUET_THROW_NOT_OK(row_index.Finish(&row_index_array));
-    schema_values.push_back(row_index_array);
-
-    std::shared_ptr<arrow::Table> table = arrow::Table::Make(schema, schema_values);
-    std::string file_name = fmt::format
-            ("/tmp/impbmpsubmittedland2.parquet");
-    std::shared_ptr<arrow::io::FileOutputStream> output_file;
-
-    PARQUET_ASSIGN_OR_THROW(output_file, arrow::io::FileOutputStream::Open(file_name));
-
-    PARQUET_THROW_NOT_OK(
-            parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), output_file, counter));
-
-    return counter;
 }
-*/
 
-int EPA_NLP::write_land(
-        const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x,
+int EPA_NLP::write_land_barefoot(
+        const std::vector<std::tuple<int, int, int, int, int, int, double>>& x, 
         const std::string& out_filename
 ) {
-    if (lc_x.size() == 0) {
+    if (x.size() == 0) {
         return 0;
     }
 
@@ -1272,11 +1141,45 @@ int EPA_NLP::write_land(
 
     int idx = 0;
     int counter = 0;
-    for (const auto& entry : lc_x) {
-        auto [lrseg, agency, load_src, bmp, amount, load_src_grp, geography, state, unit] = entry;
+    for (const auto& entry : x) {
+        auto [agency,state,bmp,geography,load_src_grp,unit,amount] = entry;
         os<<counter+1<<agency<<fmt::format("SU{}",counter)<<state<<bmp<<geography<<load_src_grp<<unit<<amount<<true<<""<<counter+1<<parquet::EndRow;
         counter++;
     }
+
+    return counter;
+}
+
+
+int EPA_NLP::write_land(
+        const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x,
+        const std::string& out_filename
+) {
+    if (lc_x.size() == 0) {
+        return 0;
+    }
+
+
+    int idx = 0;
+    int counter = 0;
+
+    std::vector<std::tuple<int, int, int, int, int, int, double> > result;
+
+    for (const auto& entry : lc_x) {
+        auto [lrseg, agency, load_src, bmp, amount, load_src_grp, geography, state, unit] = entry;
+
+        result.emplace_back(
+            agency,
+            state,
+            bmp,
+            geography,
+            load_src_grp,
+            unit,
+            amount
+        );
+        counter++;
+    }
+    counter = write_land_barefoot(result, out_filename);
 
     return counter;
 }
@@ -1470,13 +1373,17 @@ void EPA_NLP::finalize_solution(
 ) {
     status_result= (int) status;
     std::cout<<"Status: "<<status<<std::endl;
+    //create a json file that will store sobj_value in the 'cost' key
     
     write_files(n, x, m, obj_value);
     save_files(n, x);
     save_files2(n, x);
 
-    std::string out_filename = fmt::format("{}/{}_impbmpsubmittedland.parquet", path_out_, current_iteration_);
-    fmt::print("Writing land file: {}\n", out_filename);
+    auto uuid = get_uuid();
+
+    auto base_path = fmt::format("/opt/opt4cast/output/nsga3/{}/", uuid);
+    misc_utilities::mkdir(fmt::format("{}/ipopt_tmp", base_path));
+    std::string out_filename = fmt::format("{}/ipopt_tmp/{}_impbmpsubmittedland.parquet", base_path, current_iteration_);
     //copy ef_x_ to ef_x
     std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> ef_x = ef_x_;
     if (lc_x_.size() >0) {
@@ -1485,9 +1392,17 @@ void EPA_NLP::finalize_solution(
     }
 
     write_land(ef_x, out_filename);
-    std::string out_filename_json = fmt::format("{}/{}_impbmpsubmittedland.json", path_out_, current_iteration_); 
+    std::string out_filename_json = fmt::format("{}/ipopt_tmp/{}_impbmpsubmittedland.json", base_path, current_iteration_); 
+
+    json json_obj = {
+        {"ef_cost", obj_value}
+    };
+
+    auto cost_filename = fmt::format("{}/ipopt_tmp/{}_costs.json", base_path, current_iteration_);
+    std::ofstream cost_file(cost_filename);
+    cost_file<<json_obj.dump();
+    cost_file.close();
+
     write_land_json( ef_x, out_filename_json);
-
-
 }
 

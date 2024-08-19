@@ -79,7 +79,8 @@ Scenario::Scenario() {
     csvs_path = fmt::format("{}/csvs",msu_cbpo_path);
 }
 
-void Scenario::init(const std::string& filename, const std::string& filename_scenario, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled, bool is_manure_enabled) {
+void Scenario::init(const std::string& filename, const std::string& filename_scenario, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled, bool is_manure_enabled, const std::string& manure_nutrients_file) {
+    //std::string manure_nutrients_file_ = "manurenutrientsconfinement.parquet";
     this->is_ef_enabled = is_ef_enabled;
     this->is_lc_enabled = is_lc_enabled;
     this->is_animal_enabled = is_animal_enabled;
@@ -106,10 +107,9 @@ void Scenario::init(const std::string& filename, const std::string& filename_sce
     }
 
     if (is_manure_enabled) {
-        manure_counties_ = {"43"};//102: Nelson
-        auto neighbors_file = "cast_neighbors.json";
+        //manure_counties_ = {"43"};//102: Nelson
+        auto neighbors_file = "/opt/opt4cast/csvs/cast_neighbors.json";
         load_neighbors(neighbors_file);
-        auto manure_nutrients_file = "manurenutrientsconfinement.parquet";
         manure_dry_lbs_ = read_manure_nutrients(manure_nutrients_file); //call it after load_neighbors
                                                                         //
                                                                         
@@ -437,6 +437,12 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
 
     // Parse the JSON file directly into a nlohmann::json object
     json json_obj = json::parse(file);
+    if (!json_obj.contains("scenario_id")) {
+        scenario_id_ = 3814;
+    }
+    else {
+        scenario_id_ = json_obj["scenario_id"].get<size_t>();
+    }
     std::vector<std::string> keys_to_check = {"amount", "bmp_cost", "animal_unit", "lrseg", "scenario_data_str", "u_u_group", "counties" };
     for (const auto& key : keys_to_check) {
         if (!json_obj.contains(key)) {
@@ -464,7 +470,7 @@ void Scenario::load(const std::string& filename, const std::string& filename_sce
 
     std::vector<int> selected_bmps = json_obj_scenario["selected_bmps"].get<std::vector<int>>();
     //manure_counties_ = json_obj_scenario["manure_counties"].get<std::vector<std::string>>();
-    manure_counties_ = {"43"};//Lancaster: Nelson
+    //manure_counties_ = {"43"};//Lancaster: Nelson
     std::unordered_map<std::string, double> updated_bmp_cost = json_obj_scenario["bmp_cost"].get<std::unordered_map<std::string, double>>();
 
 

@@ -19,6 +19,7 @@
 #include <nlp.hpp>
 #include <eps_cnstr.h>
 #include <nlohmann/json.hpp>
+#include <crossguid/guid.hpp>
 #include <stdexcept> // For std::runtime_error
 
 using namespace Ipopt;
@@ -51,6 +52,8 @@ int main(
     std::string filename_in;
     std::string filename_scenario;
     std::string filename_uuids;
+    std::string parent_uuid_path; // the full path + the uuid of the parent file.
+    std::vector<std::string> uuids;
     std::string path_out;
     filename_in = argv[1];
     json base_scenario_json = read_json_file(filename_in);
@@ -58,20 +61,35 @@ int main(
     filename_scenario = argv[2];
     json scenario_json = read_json_file(filename_scenario);
 
-    filename_uuids = argv[3];
-    json uuids_json = read_json_file(filename_uuids);
+    /*
+    /home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr /opt/opt4cast/output/nsga3/eaa0e674-f7fe-4755-bb21-8ae479c85953/config/reportloads_processed.json 
+    /opt/opt4cast/output/nsga3/eaa0e674-f7fe-4755-bb21-8ae479c85953/config/scenario.json 
+    /opt/opt4cast/output/nsga3/eaa0e674-f7fe-4755-bb21-8ae479c85953/front 
+    0 
+    0.7 
+    20
+    */
 
-
-    path_out = argv[4];
-    int pollutant_idx = atoi(argv[5]); // 0
-    double reduction= 1.0 - atof(argv[6]); // 0.9
-    int nsteps = atoi(argv[7]); //5
+    path_out = argv[3];
+    int pollutant_idx = std::atoi(argv[4]); // 0
+    double reduction= 1.0 - std::atof(argv[5]); // 0.9
+    int nsteps = std::atoi(argv[6]); //5
     
     bool evaluate_cast = true;
 
-    if (argc > 9) {
-        evaluate_cast = ( atoi(argv[8]) == 1)? true : false;
+    if (argc > 7) {
+        evaluate_cast = ( std::atoi(argv[7]) == 1)? true : false;
     }
+    if (argc > 8) {
+        parent_uuid_path = argv[8];
+    }
+
+    for (int i = 0; i < nsteps; i++) {
+        uuids.push_back(xg::newGuid().str());
+    }
+
+    
+
 
     fmt::print("filename_scenario: {}\n", filename_scenario);
 
@@ -92,8 +110,8 @@ int main(
     }
     */
     if (option == 1) { //ipopt Opt3
-        EpsConstraint eps_constr(base_scenario_json, scenario_json, uuids_json, path_out, pollutant_idx, evaluate_cast);
-        eps_constr.constr_eval(reduction, nsteps);
+        EpsConstraint eps_constr(base_scenario_json, scenario_json, path_out, pollutant_idx, evaluate_cast);
+        eps_constr.constr_eval(reduction, nsteps, uuids, parent_uuid_path);
     }
     /*
     if (option == 6) { //ipopt Opt3

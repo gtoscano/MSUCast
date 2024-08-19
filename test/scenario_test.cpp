@@ -33,7 +33,8 @@ int main (int argc, char *argv[]) {
 
 
 
-    scenario.init(filename, filename_scenario, is_ef_enabled, is_lc_enabled, is_animal_enabled, is_manure_enabled);
+    std::string manure_nutrients_file = "manure_nutrients.json";
+    scenario.init(filename, filename_scenario, is_ef_enabled, is_lc_enabled, is_animal_enabled, is_manure_enabled, manure_nutrients_file);
     int lc_size = scenario.get_lc_size();
     int animal_size = scenario.get_animal_size();
     std::vector<double > x(lc_size + animal_size);

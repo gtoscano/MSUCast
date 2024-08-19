@@ -68,7 +68,7 @@ namespace {
 
 
 int main (int argc, char *argv[]) {
-    int nparts = 20;
+    int nparts = 4;
     int nobjs = 2;
     int max_iter = 1;
     double c1 = 1.4;
@@ -83,8 +83,11 @@ int main (int argc, char *argv[]) {
     bool is_lc_enabled = true;
     bool is_animal_enabled = false;
     bool is_manure_enabled = false;
+    std::string manure_nutrients_file = "manure_nutrients.json";
     // Jefferson.json 
     //./PSOCast Nelson.json an-all 0 0 1
+    // ./pso /opt/opt4cast/output/nsga3/2d3661e2-2012-493f-87ef-65b544f14902/config/reportloads_processed.json /opt/opt4cast/output/nsga3/2d3661e2-2012-493f-87ef-65b544f14902/config/scenario.json ./test 1 1 0 0
+    //
     if (argc > 1) {
         input_filename = argv[1];
         scenario_filename = argv[2];
@@ -94,8 +97,11 @@ int main (int argc, char *argv[]) {
         is_animal_enabled = std::stoi(argv[6]);
         is_manure_enabled = std::stoi(argv[7]);
     } 
+    if (argc > 8) {
+        manure_nutrients_file = argv[8];
+    }
 
-    PSO pso(nparts, nobjs, max_iter, w, c1, c2, lb, ub, input_filename, scenario_filename, dir_output, is_ef_enabled, is_lc_enabled, is_animal_enabled, is_manure_enabled);
+    PSO pso(nparts, nobjs, max_iter, w, c1, c2, lb, ub, input_filename, scenario_filename, dir_output, is_ef_enabled, is_lc_enabled, is_animal_enabled, is_manure_enabled, manure_nutrients_file);
     pso.optimize();
     pso.save_gbest(dir_output);
     //std::vector<Particle> gbest = pso.get_gbest();

@@ -31,7 +31,7 @@ public:
     bool has_content;
    /** Default constructor */
 
-    EPA_NLP(const json& base_scenario_json, const json& scenario_json, const json& uuids_json, const std::string& path_out, int pollutant_idx);
+    EPA_NLP(const json& base_scenario_json, const json& scenario_json, const std::string& path_out, int pollutant_idx);
    /** Default destructor */
    virtual ~EPA_NLP();
 
@@ -177,9 +177,15 @@ public:
    void update_reduction(double,int);
 
     std::string get_scenario_data();
-    std::vector<std::string> get_uuids();
     std::string get_uuid();
     void append_lc_x(const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x);
+
+    std::vector<std::tuple<int, int, int, int, int, int, double>> read_land(const std::string& filename);
+
+    int write_land_barefoot(
+        const std::vector<std::tuple<int, int, int, int, int, int, double>>& x, 
+        const std::string& out_filename
+    ); 
 private:
    /**@name Methods to block default compiler methods.
     *
@@ -208,7 +214,7 @@ private:
     //int compute_efficiency();
     void compute_eta();
 
-    void load(const json& base_scenario_json, const json& scenario_json, const json& uuids_json);
+    void load(const json& base_scenario_json, const json& scenario_json);
 
 
     size_t ef_size_;
@@ -239,7 +245,7 @@ private:
     std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> ef_x_;
     std::vector<std::tuple<int, int, int, int, double, int, int, int, int>> lc_x_;
     std::string uuid_;
-    std::vector<std::string> uuids_;
+
 
     int write_land(
         const std::vector<std::tuple<int, int, int, int, double, int, int, int, int>>& lc_x,

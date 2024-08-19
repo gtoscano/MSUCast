@@ -27,6 +27,9 @@
 #include <regex>
 #include <filesystem>
 #include <boost/algorithm/string.hpp>
+#include <optional>
+#include <fstream>
+#include <algorithm>
 
 #include <nlohmann/json.hpp>
 
@@ -36,6 +39,120 @@
 namespace fs = std::filesystem;
 
 using json = nlohmann::json;
+
+/***************************************************************************/
+struct CostData {
+    double objective1;
+    double objective2;
+    std::optional<double> objective3; // Optional third objective
+    std::string file_index;
+};
+
+// Function to check if one solution dominates another
+bool dominates(const CostData& a, const CostData& b, int num_objectives) {
+    if (num_objectives == 2) {
+        return (a.objective1 <= b.objective1 && a.objective2 <= b.objective2) &&
+               (a.objective1 < b.objective1 || a.objective2 < b.objective2);
+    } else if (num_objectives == 3 && a.objective3.has_value() && b.objective3.has_value()) {
+        return (a.objective1 <= b.objective1 && a.objective2 <= b.objective2 && a.objective3.value() <= b.objective3.value()) &&
+               (a.objective1 < b.objective1 || a.objective2 < b.objective2 || a.objective3.value() < b.objective3.value());
+    }
+    return false;
+}
+
+// Function to find non-dominated solutions
+std::vector<std::string> find_pareto_front(const std::vector<CostData>& data, int num_objectives) {
+    std::vector<std::string> pareto_front;
+
+    for (const auto& current : data) {
+        bool is_dominated = false;
+
+        for (const auto& other : data) {
+            if (dominates(other, current, num_objectives)) {
+                is_dominated = true;
+                break;
+            }
+        }
+
+        if (!is_dominated) {
+            pareto_front.push_back(current.file_index);
+        }
+    }
+
+    return pareto_front;
+}
+
+std::vector<CostData> readCostFiles(const std::vector<std::string>& objs, const std::string& directory) {
+    std::vector<CostData> data;
+    int num_objectives = objs.size();
+
+    for (const auto& entry : fs::directory_iterator(directory)) {
+        std::string filename = entry.path().filename().string();
+        if (filename.ends_with("_costs.json")) {
+            std::ifstream file(entry.path());
+            json j;
+            file >> j;
+
+            CostData cost_data;
+            cost_data.objective1 = j[objs[0]];
+            cost_data.objective2 = j[objs[1]];
+            if (num_objectives == 3) {
+                cost_data.objective3 = j[objs[2]];
+            } else {
+                cost_data.objective3 = std::nullopt;
+            }
+
+            // Extract and store everything before the first underscore
+            cost_data.file_index = filename.substr(0, filename.find('_'));
+
+            data.push_back(cost_data);
+        }
+    }
+
+    return data;
+}
+
+
+std::vector<std::string> findParetoFrontFiles(const std::vector<std::string>& objs, const std::string& directory) {
+
+    int num_objectives = objs.size();
+    std::vector<CostData> data;
+    data = readCostFiles(objs, directory);
+    return find_pareto_front(data, num_objectives);
+}
+
+void writeCSV(const std::vector<CostData>& data, const std::string& output_file, const std::vector<std::string>& objs) {
+    std::vector<CostData> sorted_data = data;
+    std::sort(sorted_data.begin(), sorted_data.end(), [](const CostData& a, const CostData& b) {
+        return std::stol(a.file_index) < std::stol(b.file_index);
+    });
+    std::ofstream csv_file(output_file);
+
+
+    // Write the header
+    //csv_file << "file_index," << objs[0] << "," << objs[1];
+    /*
+    if (objs.size() == 3) {
+        csv_file << "," << objs[2];
+    }
+    csv_file << "\n";
+    */
+
+    // Write the data
+    //
+    csv_file << std::fixed << std::setprecision(6); // Set the precision to 10 decimal places
+    for (const auto& entry : sorted_data) {
+        csv_file << entry.objective1 << "," << entry.objective2;
+        if (entry.objective3.has_value()) {
+            csv_file << "," << entry.objective3.value();
+        }
+        csv_file << "\n";
+    }
+
+    csv_file.close();
+}
+/***************************************************************************/
+
 
 
 namespace {
@@ -207,7 +324,7 @@ namespace {
 }
 
 
-PSO::PSO(int nparts, int nobjs, int max_iter, double w, double c1, double c2, double lb, double ub, const std::string& input_filename, const std::string& scenario_filename, const std::string& out_dir, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled, bool is_manure_enabled ) {
+PSO::PSO(int nparts, int nobjs, int max_iter, double w, double c1, double c2, double lb, double ub, const std::string& input_filename, const std::string& scenario_filename, const std::string& out_dir, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled, bool is_manure_enabled, const std::string& manure_nutrients_file ) {
     out_dir_= out_dir;
     is_ef_enabled_ = is_ef_enabled;
     is_lc_enabled_ = is_lc_enabled;
@@ -217,7 +334,7 @@ PSO::PSO(int nparts, int nobjs, int max_iter, double w, double c1, double c2, do
     lc_size_ = 0;
     animal_size_ = 0;
     manure_size_ = 0;
-    init_cast(input_filename, scenario_filename);
+    init_cast(input_filename, scenario_filename, manure_nutrients_file);
     input_filename_ = input_filename;
     scenario_filename_ = scenario_filename;
     this->nparts = nparts;
@@ -286,9 +403,7 @@ PSO& PSO::operator=(const PSO &p) {
 }
 
 PSO::~PSO() {
-    delete_tmp_files();
-
-
+    //delete_tmp_files();
 }
 void PSO::delete_tmp_files(){
     int counter = 0;
@@ -315,7 +430,7 @@ void PSO::delete_tmp_files(){
 }
 
 
-void PSO::init_cast(const std::string& input_filename, const std::string& scenario_filename) {
+void PSO::init_cast(const std::string& input_filename, const std::string& scenario_filename, const std::string& manure_nutrients_file) {
     emo_uuid_ = xg::newGuid().str();
     fmt::print("emo_uuid: {}\n", emo_uuid_);
     std::string emo_path = fmt::format("/opt/opt4cast/output/nsga3/{}/", emo_uuid_);
@@ -323,7 +438,7 @@ void PSO::init_cast(const std::string& input_filename, const std::string& scenar
     std::unordered_map<std::string, int> generation_uuid_idx;
     misc_utilities::mkdir(emo_path);
 
-    scenario_.init(input_filename, scenario_filename, is_ef_enabled_, is_lc_enabled_, is_animal_enabled_, is_manure_enabled_);
+    scenario_.init(input_filename, scenario_filename, is_ef_enabled_, is_lc_enabled_, is_animal_enabled_, is_manure_enabled_, manure_nutrients_file);
     lc_size_ = scenario_.get_lc_size();
     fmt::print("lc_size: {}\n", lc_size_);
     animal_size_ = scenario_.get_animal_size();
@@ -371,6 +486,7 @@ void PSO::optimize() {
     }
 
     //exec_ipopt();
+    fmt::print("======================Finaliza Optimize===========================================\n");
 
     exec_ipopt_all_sols();
     //evaluate_ipopt_sols();
@@ -422,7 +538,6 @@ void PSO::exec_ipopt_all_sols(){
     int min_idx = 0;
     int max_idx = 0; 
     int mid_idx;
-    int ipopt_popsize = 6;
     std::vector<double> values;
 
     for (const auto& particle : gbest_) {
@@ -442,18 +557,28 @@ void PSO::exec_ipopt_all_sols(){
     mid_idx = indices[indices.size() / 2];
     std::vector<int> idx_vec = {min_idx, mid_idx, max_idx};
     std::string path = fmt::format("/opt/opt4cast/output/nsga3/{}", emo_uuid_);
-    json scenario_json = misc_utilities::read_json_file(fmt::format("{}/scenario.json", path));
-
+    std::string ipopt_path = fmt::format("{}/ipopt", path);
+    int counter = 0;
+    //json scenario_json = misc_utilities::read_json_file(fmt::format("{}/scenario.json", path));
    for (const auto& idx : idx_vec) { 
         auto lc_cost = gbest_[idx].get_lc_cost();
         auto animal_cost = gbest_[idx].get_animal_cost();
         auto manure_cost = gbest_[idx].get_manure_cost();
         auto parent_uuid = gbest_[idx].get_uuid();
+        auto parent_uuid_path = fmt::format("{}/{}", path, parent_uuid);
+
+        json costs_json_file;
+        costs_json_file["lc_cost"] = lc_cost;
+        costs_json_file["animal_cost"] = animal_cost;
+        costs_json_file["manure_cost"] = manure_cost;
+
+        misc_utilities::write_json_file(fmt::format("{}_costs.json", parent_uuid_path), costs_json_file);
+
         //execute.set_files(emo_uuid_, in_file);
         //execute.execute(emo_uuid_, 0.50, 6, 20);
 
         fmt::print("Particle Selected Cost: {}\n", gbest_[idx].get_fx()[0]);
-        execute.update_output(emo_uuid_, gbest_[idx].get_fx()[0]);
+        //execute.update_output(emo_uuid_, gbest_[idx].get_fx()[0]);
         fmt::print("======================== best_lc_cost_: {}\n", lc_cost);
         fmt::print("======================== best_animal_cost_: {}\n", animal_cost);
         fmt::print("======================== best_manure_cost_: {}\n", manure_cost);
@@ -461,26 +586,83 @@ void PSO::exec_ipopt_all_sols(){
         if (idx == min_idx) postfix = "min";
         else if (idx == max_idx) postfix = "max";
         else postfix = "median";
-        std::string out_path = fmt::format("{}/ipopt_results-all-sols-{}", path, postfix);
 
-        auto uuids = generate_n_uuids(ipopt_popsize);
-        int sinfo = 0;
-        std::string report_loads_path = fmt::format("{}/{}_reportloads.csv", path, parent_uuid);
-        std::string output_path_prefix = fmt::format("{}/{}", path, parent_uuid);
+        std::string report_loads_path = fmt::format("{}_reportloads.csv", parent_uuid_path);
+        fmt::print("===================================================================================== Scenario_id: {}\n", scenario_.get_scenario_id());
 
-        execute.get_json_scenario( sinfo, report_loads_path, output_path_prefix);
+       execute.get_json_scenario( scenario_.get_scenario_id(), report_loads_path, parent_uuid_path);
 
-        copy_parquet_files_for_ipopt(path, parent_uuid, uuids);
+        auto base_scenario_filename = fmt::format("{}_reportloads_processed.json", parent_uuid_path);
+        fmt::print("base_scenario_filename: {}\n", base_scenario_filename);
 
-        json base_scenario_json = misc_utilities::read_json_file(fmt::format("{}/reportloads_processed.json", path));
+
+        //misc_utilities::ls_path(path);
+        //json base_scenario_json = misc_utilities::read_json_file(base_scenario_filename);
+        
         json uuids_json;
-        uuids_json["uuids"] = uuids;
+        //auto uuids = generate_n_uuids(ipopt_popsize);
+        //uuids_json["uuids"] = uuids;
+        //copy_parquet_files_for_ipopt(path, parent_uuid, uuids);
         int pollutant_idx = 0;
-        double ipopt_reduction = 0.50;
-        int ipopt_popsize = 10;
+        double ipopt_reduction = 0.30;  
+        int nsteps = 4;
+
+        //OPT4CAST_RUN_EPS_CNSTR_PATH = os.environ.get('OPT4CAST_RUN_EPS_CNSTR_PATH', '/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr')
+        auto reportloads_json_path = base_scenario_filename;
+        auto scenario_json_path = scenario_filename_;
+        fmt::print("parent_uuid_path: {}", parent_uuid_path);
+
+        execute.execute_new(
+                base_scenario_filename,
+                scenario_filename_,
+                parent_uuid_path,
+                pollutant_idx, //0
+                ipopt_reduction, //0.30
+                nsteps,//10
+                1,
+                parent_uuid_path 
+            );
+        fmt::print("before move_files\n");
+        misc_utilities::move_files(parent_uuid_path, ipopt_path, nsteps, counter*nsteps);
+
+
+        /*
+        for (int i(0); i< nsteps; ++i) {
+            auto src_parent_land = fmt::format("{}_impbmpsubmittedland.parquet", parent_uuid_path);
+            auto src_land_file = fmt::format("{}/{}_{}",path, i,"impbmpsubmittedland.parquet");
+            auto dst_land_file = fmt::format("{}/{}_impbmpsubmittedland.parquet", parent_uuid_path, uuids[i]);
+
+            auto src_parent_animal = fmt::format("{}_impbmpsubmittedanimal.parquet", parent_uuid_path);
+            auto dst_animal_file = fmt::format("{}/{}_impbmpsubmittedanimal.parquet", parent_uuid_path, uuids[i]);
+        }
+
+        */
+        //args = [OPT4CAST_RUN_EPS_CNSTR_PATH, reportloads_json_path, scenario_json_path,  str(sel_pollutant), str(target_pct), str(niterations)]
+
+        //evaluate ipopt solutions
+
+
         //evaluate_ipopt_sols(sub_dir, ipopt_uuid, animal_cost, manure_cost);
         //EpsConstraint eps_constr(base_scenario_json, scenario_json, uuids_json, path_out, pollutant_idx, evaluate_cast);
+        //
+        //update_non_dominated_solutions(gbest_, particles[j]);
+        ++counter;
     }
+
+
+    std::vector<std::string> objectives = {"cost", "EoS-N"};  // Example: change as needed
+    std::string directory = ipopt_path; 
+    std::string pf_path = fmt::format("{}/front", path);
+    std::string csv_path = fmt::format("{}/front/pareto_front.txt", path);
+
+        fmt::print("before find pareto frontfiles \n");
+    std::vector<std::string> pf_files = findParetoFrontFiles(objectives, directory);
+    misc_utilities::move_pf(ipopt_path, pf_path, pf_files);
+
+    std::vector<CostData> pf_data = readCostFiles(objectives, pf_path);
+
+    writeCSV(pf_data, csv_path, objectives);
+
 }
 
 
@@ -528,7 +710,6 @@ void PSO::evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipo
             misc_utilities::copy_file(fmt::format("{}/{}_impbmpsubmittedmanuretransport.parquet", emo_path, ipopt_uuid), manure_dst );
         }
 
-
         total_cost_map[exec_uuid] = scenario_.compute_cost(combined) + animal_cost + manure_cost;
     }
 
@@ -541,7 +722,7 @@ void PSO::evaluate_ipopt_sols(const std::string& sub_dir, const std::string& ipo
     misc_utilities::copy_file(fmt::format("{}/config/ipopt2.json", emo_path), fmt::format("{}/ipopt2.json", dir_path));
     
     std::vector<std::vector<double>> result_fx;
-    auto counter = 0;
+    int counter = 0;
     for (const auto& result : results) {
         std::vector<std::string> result_vec;
         misc_utilities::split_str(result, '_', result_vec);
@@ -765,10 +946,14 @@ void PSO::save_gbest(std::string out_dir) {
     //create directory: out_dir
     //misc_utilities::mkdir(out_dir);
 
-    auto pfront_path = fmt::format("{}/front", out_dir);
-    std::string emo_path = fmt::format("/opt/opt4cast/output/nsga3/{}", emo_uuid_);
+    auto pf_path = fmt::format("{}", out_dir);
+    std::string emo_path = fmt::format("/opt/opt4cast/output/nsga3/{}/front", emo_uuid_);
+
+    misc_utilities::copy_full_directory(emo_path, pf_path);
+
+    /*
     int counter = 0;
-    misc_utilities::mkdir(pfront_path);
+    misc_utilities::mkdir(pf_path);
     for(const auto& particle : gbest_) {
         const auto& uuid = particle.get_uuid();
         std::regex pattern (uuid);
@@ -784,15 +969,16 @@ void PSO::save_gbest(std::string out_dir) {
 
         counter++;
     }
+    */
+    /*
     auto x_filename = fmt::format("{}/pareto_set.txt", pfront_path);
     auto fx_filename = fmt::format("{}/pareto_front.txt", pfront_path);
     save(gbest_, x_filename, fx_filename);
 
     execute.get_files(emo_uuid_, fmt::format("{}/ipopt", out_dir));
     misc_utilities::copy_file(fmt::format("{}/ipopt/pfront_ef.txt", out_dir), fmt::format("{}/front/pfront_ef.txt", out_dir));
+    */
 
 }
-
-
 
 

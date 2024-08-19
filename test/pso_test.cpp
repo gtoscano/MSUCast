@@ -41,7 +41,9 @@ int main (int argc, char *argv[]) {
     std::string input_filename = "prueba.json";
     std::string scenario_filename = "my_prueba.json";
     std::string out_dir = "out";
-    PSO pso(nparts, nobjs, max_iter, w, c1, c2, lb, ub, input_filename, scenario_filename, out_dir, false, true, true, true);
+
+    std::string manure_nutrients_file = "manure_nutrients.json";
+    PSO pso(nparts, nobjs, max_iter, w, c1, c2, lb, ub, input_filename, scenario_filename, out_dir, false, true, true, true, manure_nutrients_file);
     pso.optimize();
     std::vector<std::vector<double>> gbest_x = pso.get_gbest_x();
     std::vector<std::vector<double>> gbest_fx = pso.get_gbest_fx();

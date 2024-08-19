@@ -30,7 +30,8 @@ class Scenario {
             return manure_size_;
         }
         void initialize_vector(std::vector<double>& x);
-        void init(const std::string& filename, const std::string& scenario_filename, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled , bool is_manure_enabled);
+        void init(const std::string& filename, const std::string& scenario_filename, bool is_ef_enabled, bool is_lc_enabled, bool is_animal_enabled , bool is_manure_enabled, const std::string& manure_nutrients_file);
+
         size_t get_nvars() {
             return nvars_;
         }
@@ -42,6 +43,9 @@ class Scenario {
         }
         size_t get_manure_begin() {
             return manure_begin_;
+        }
+        size_t get_scenario_id() {
+            return scenario_id_;
         }
 
         double normalize_lc(const std::vector<double>& x, 
@@ -71,6 +75,7 @@ class Scenario {
         std::unordered_map<std::string, double> read_manure_nutrients(const std::string& filename);
 
     private:
+        size_t scenario_id_;
         size_t ef_size_;
         size_t lc_size_;
         size_t animal_size_;
