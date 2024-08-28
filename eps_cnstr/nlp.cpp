@@ -532,7 +532,7 @@ bool EPA_NLP::eval_f(
 
                 auto bmp_cost_key = fmt::format("{}_{}", state_id, bmp);
                 double cost = pct * alpha * bmp_cost_[bmp_cost_key];
-                if(cost<0.0){
+                if(cost < 0.0){
                     fmt::print("cost: {}\n", cost);
                     fmt::print("pct: {}\n", pct);
                     fmt::print("alpha: {}\n", alpha);
