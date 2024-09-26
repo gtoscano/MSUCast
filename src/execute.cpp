@@ -240,7 +240,7 @@ void Execute::get_json_scenario(
 
     std::string OPT4CAST_MAKE_SCENARIO_FILE_PATH = misc_utilities::get_env_var("OPT4CAST_MAKE_SCENARIO_FILE_PATH", "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test");
     
-    OPT4CAST_MAKE_SCENARIO_FILE_PATH = "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test";
+    //OPT4CAST_MAKE_SCENARIO_FILE_PATH = "/home/gtoscano/projects/CastEvaluation/build/test/scenario_test";
 
     std::string exec_string = fmt::format("{} {} {} {}", 
                 OPT4CAST_MAKE_SCENARIO_FILE_PATH, 
