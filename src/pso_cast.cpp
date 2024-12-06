@@ -70,7 +70,7 @@ namespace {
 int main (int argc, char *argv[]) {
     int nparts = 4;
     int nobjs = 2;
-    int max_iter = 1;
+    int max_iter = 20;
     double c1 = 1.4;
     double c2 = 1.4;
     double w = 0.7;
