@@ -605,7 +605,7 @@ void PSO::exec_ipopt_all_sols(){
         //copy_parquet_files_for_ipopt(path, parent_uuid, uuids);
         int pollutant_idx = 0;
         double ipopt_reduction = 0.30;  
-        int nsteps = 4;
+        int nsteps = 10;
 
         //OPT4CAST_RUN_EPS_CNSTR_PATH = os.environ.get('OPT4CAST_RUN_EPS_CNSTR_PATH', '/home/gtoscano/projects/MSUCast/build/eps_cnstr/eps_cnstr')
         auto reportloads_json_path = base_scenario_filename;
